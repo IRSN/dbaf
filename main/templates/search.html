@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block head %}
+   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<script>
+var doseRates = {};
+var data = {};
+
+function getColor(i, j)
+{
+  var colorTot = ["#3182BD", "#E6550D", "#31A354", "#756BB1", "#636363", "#5254A3", "#8CA252", "#BD9E39", "#AD494A", "#A55194"];
+  var colorBas = ["#6BAED6", "#FD8D3C", "#74C476", "#9E9AC8", "#969696", "#6B6ECF", "#B5CF6B", "#E7BA52", "#D6616B", "#CE6DBD"];
+  var colorHaut = ["#9ECAE1", "#FDAE6B", "#A1D99B", "#BCBDDC", "#BDBDBD", "#9C9EDE", "#CEDB9C", "#E7CB94", "#E7969C", "#DE9ED6"];
+  if (j == "total")
+    return (colorTot[i % colorTot.length])
+  if (j == "bas")
+    return (colorBas[i % colorBas.length])
+  if (j == "haut")
+    return (colorHaut[i % colorHaut.length])
+}
+
+
+function plot(airport, keepScale)
+{
+  lay = document.getElementById(airport).layout;
+  xrange = undefined;
+  yrange = undefined;
+  if (lay != undefined && keepScale == true)
+  {
+    xrange = lay.xaxis.range;
+    yrange = lay.yaxis.range;
+  }    
+  Plotly.react(airport, data[airport].d, {title : airport, 
+    xaxis : {tickformat : "%H:%M:%S", hoverformat : "%H:%M:%S", title : "flight time", range : xrange},
+    yaxis : {title : "µSv/h", range : yrange},
+    showlegend : false});
+}
+
+// change display bas, haut, total
+function checkLET(airport, keepScale)
+{
+  var hover = ['none', 'y+name'];
+  var is_bas = +document.getElementById("check_bas_" + airport).checked;
+  var is_haut = +document.getElementById("check_haut_" + airport).checked;
+  var is_total = +document.getElementById("check_total_" + airport).checked;
+
+  for (i = 0; i < data[airport].d.length; i++)
+  {
+    if (data[airport].d[i].dose == 'bas')
+    {
+      data[airport].d[i].opacity = is_bas;
+      data[airport].d[i].hoverinfo = hover[is_bas];
+    }  
+    else if (data[airport].d[i].dose == 'haut')
+    {
+      data[airport].d[i].opacity = is_haut;
+      data[airport].d[i].hoverinfo = hover[is_haut];
+    }
+    else if (data[airport].d[i].dose == 'total')
+    {
+      data[airport].d[i].opacity = is_total;
+      data[airport].d[i].hoverinfo = hover[is_total];
+    }
+  }
+  plot(airport, keepScale);
+}
+
+// add a plot
+function addGraph(key)
+{
+  var json = doseRates[key];
+  var airport = json['from'].split(' ')[0] + '-' + json['to'].split(' ')[0];
+  
+  if (data[airport] == undefined)
+  {
+    var graphs = document.getElementById("graphs");
+    graphs.innerHTML += "<div id='div_"+airport+"'><div id='" + airport + "' style='width:90%;height:500px;display:inline-block'>"
+      + "</div><div style='width:10%;display:inline-block;vertical-align:top;padding-top:100px'>"
+      + "<input onchange='checkLET(\""+ airport +"\", true)' type='checkbox' id='check_bas_" + airport + "' checked/><label for='check_bas_"+airport+"'> low LET</label><br>"
+      + "<input onchange='checkLET(\""+ airport +"\", true)' type='checkbox' id='check_haut_" + airport + "' checked/><label for='check_haut_"+airport+"'> high LET</label><br>"
+      + "<input onchange='checkLET(\""+ airport +"\", true)' type='checkbox' id='check_total_" + airport + "' checked/><label for='check_total_"+airport+"'> total</label>"
+      + "<div style='height:400px'></div></div></div>";
+    data[airport] = {'d' : [], 'nb' : 0};
+  }
+  
+  colorB = getColor(data[airport].nb, "bas");
+  colorH = getColor(data[airport].nb, "haut");
+  colorT = getColor(data[airport].nb, "total");
+  data[airport].nb++;
+  if ("bas" in json)
+   data[airport].d.push({'x' : json.time, 'y' : json.bas, 'key' : key, 'line' : {'color' : colorB}, 'dose' : 'bas', 'name' : json.dev, 'connectgaps' : true});
+  if ("haut" in json)
+   data[airport].d.push({'x' : json.time, 'y' : json.haut, 'key' : key, 'line' : {'color' : colorH}, 'dose' : 'haut', 'name' : json.dev, 'connectgaps' : true});
+  if ("total" in json)
+    data[airport].d.push({'x' : json.time, 'y' : json.total, 'key' : key, 'line' : {'color' : colorT}, 'dose' : 'total', 'name' : json.dev, 'connectgaps' : true});
+  checkLET(airport, false);
+}
+
+// remove a plot
+function subGraph(key)
+{
+  var json = doseRates[key];
+  var airport = json['from'].split(' ')[0] + '-' + json['to'].split(' ')[0];
+ 
+  for (i = 0; i < data[airport].d.length; i++)
+    if (data[airport].d[i].key == key)
+    {
+      data[airport].d.splice(i, 1);
+      i--;
+    }
+  plot(airport, false);
+  if (data[airport].d.length == 0)
+    {
+      graph = document.getElementById("div_" + airport);
+      graph.parentElement.removeChild(graph);
+      delete data[airport];
+    }   
+}
+
+// get data to plot
+function checkData(check, file_fk, flight_fk)
+{
+  key = file_fk + '-' + flight_fk;
+  if (check.checked == false)
+  {
+    subGraph(key);
+    return;
+  }
+  if (doseRates[key] != undefined)
+  {
+    addGraph(key);
+    return;
+  }
+  var req = new XMLHttpRequest();
+  req.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+          json = JSON.parse(req.responseText);
+          doseRates[key] = json;
+          addGraph(key);
+      }
+  };
+  url = "{% url 'rate_' %}?file=" + file_fk + "&flight=" + flight_fk;
+  req.open("GET", url);
+  req.send();
+}
+
+// search integrated dose and display table + histogrammes + statistiques
+function search()
+{
+  var fnum = document.getElementById("flightNum").value;
+  var dep = document.getElementById("dep").value;
+  var arr = document.getElementById("arr").value;
+  var min = document.getElementById("date_min").value;
+  var max = document.getElementById("date_max").value;
+  var res = document.getElementById("result");
+  var search_res = document.getElementById("search_res");
+  var no_res = document.getElementById("no_res");
+  var download_csv = document.getElementById("download_csv");
+  var download_excel = document.getElementById("download_excel");
+  var graphs = document.getElementById("graphs");
+  
+  doseRates = {};
+  data = {};
+  graphs.innerHTML = "";
+  var req = new XMLHttpRequest();
+  req.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+         json = JSON.parse(req.responseText);
+         if (json.res.length == 0)
+         {
+            search_res.style.display = "none";
+            no_res.style.display = "block";
+            return ;
+         }
+         no_res.style.display = "none";
+         search_res.style.display = "block";
+         res.innerHTML = "";
+         data_histo = [{x : [], y : [], name : 'low LET', type : 'bar', text : []},
+              {x : [], y : [], name : 'high LET', type : 'bar', text : []},
+              {x : [], y : [], name : 'total', mode : 'markers', marker:{symbol:"line-ns"}, text : []}];
+         data_stats = [{y : [], name : 'low LET', type : 'box', boxmean : 'sd', boxpoints : 'all'},
+              {y : [], name : 'high LET', type : 'box', boxmean : 'sd', boxpoints : 'all'},
+              {y : [], name : 'total', type : 'box', boxmean : 'sd', boxpoints : 'all'}];
+         for (i = 0; i < json.res.length; i++)
+         {
+            res.innerHTML += '<tr><td><input type="checkbox" onchange="checkData(this,'
+            + json.res[i].file_fk + ',' + json.res[i].flight_fk +')"/></td><td>'
+            + '<a href="{% url "home"%}view/flight/'+ json.res[i].flight_fk +'">'+ json.res[i].num +' </a></td><td>'
+            + json.res[i].date +' </td><td>'
+            + json.res[i].from +' </td><td>'+ json.res[i].to +' </td><td>'
+            + json.res[i].device +' </td><td>'+
+            + json.res[i].bas +' </td><td>'+ json.res[i].haut +' </td><td>'
+            + json.res[i].total +'</td></tr>';
+            data_histo[0].x.push(json.res[i].off + " (" + i + ")");
+            data_histo[0].y.push(json.res[i].bas);
+            data_histo[0].text.push(json.res[i].num);
+            data_histo[1].x.push(json.res[i].off + " (" + i + ")");
+            data_histo[1].y.push(json.res[i].haut);
+            data_histo[2].x.push(json.res[i].off + " (" + i + ")");
+            data_histo[2].y.push(json.res[i].total + 1);
+            data_histo[1].text.push(json.res[i].num);
+            data_stats[0].y.push(json.res[i].bas);
+            data_stats[1].y.push(json.res[i].haut);
+            data_stats[2].y.push(json.res[i].total);
+         }
+         Plotly.newPlot('histo', data_histo, {barmode : 'stack', title : 'integrated dose for each flight', yaxis : {title : "µSv"}, xaxis : {title : "flight date"}});
+         Plotly.newPlot('stats', data_stats, {title : 'statistiques', yaxis : {title : "µSv"}});
+      } 
+  };
+  var dev = "";
+  for (k in devsByType)
+    for (i = 0; i < devsByType[k].length; i++)
+      if (document.getElementById("dev-" + devsByType[k][i]).checked)
+        dev += devsByType[k][i] + ","
+  var url = "{% url 'search_' %}?num="+ fnum +"&dep=" + dep +
+    "&arr=" + arr + "&min=" + min + "&max=" + max + "&dev=" + dev;
+  req.open("GET", url);
+  download_csv.href = url + "&format=csv";
+  download_excel.href = url + "&format=excel";
+  req.send();
+}
+
+window.onload = function(e) {
+  $('#dev').on('click', function(event){
+    var events = $._data(document, 'events') || {};
+    events = events.click || [];
+    for(var i = 0; i < events.length; i++) {
+        if(events[i].selector) {
+            if($(event.target).is(events[i].selector)) {
+                events[i].handler.call(event.target, event);
+            }
+            $(event.target).parents(events[i].selector).each(function(){
+                events[i].handler.call(this, event);
+            });
+        }
+    }
+    event.stopPropagation();
+  });
+};
+
+var devsByType = {
+    {% for typ, devs in devices.items %} "{{typ}}" : [{% for dev in devs %}
+        "{{dev.id}}",{% endfor %}
+    ],{% endfor %}
+}
+
+function checkAll(key)
+{
+  var check = document.getElementById("dtype-" + key).checked;
+  var list = devsByType[key];
+  for (i = 0; i < list.length; i++)
+    document.getElementById("dev-" + list[i]).checked = check; 
+}
+</script>
+<b>Search form:</b> Device type is required (one or more). You can then search by flight(s) number(s), IATA codes or dates (or a combination of them)<br>
+Tip: Be sure to include a space between company code and flight number (AF 009 not AF009)<hr>
+<label for="flightNum">flight number : </label>
+<input type='text' id="flightNum" placeholder="AF 009 / AF 008"/>
+<label for="dep">from : </label>
+<input type='text' id="dep" placeholder="CDG / JFK"/>
+<label for="arr">to : </label>
+<input type='text' id="arr" placeholder="JFK / CDG"/>
+<br><br>
+<label for="dev">device :</label>
+<div class="dropdown" style="display:inline" id="dev" size="7">
+ <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">select device
+    <span class="caret"></span></button>
+    <ul class="dropdown-menu" style="height:auto; max-height:200px; overflow-x:hidden">
+      {% for typ, devs in devices.items %}
+      <li><label style="padding-left:10px;font-weight: normal;"><input type="checkbox" onchange="checkAll('{{typ}}')" id="dtype-{{typ}}">{{typ}}</label></li>
+      {% for dev in devs %}
+        <li><label style="padding-left:40px;font-weight: normal;"><input type="checkbox" id="dev-{{dev.id}}">{{dev.serial_num}}</label></li>
+      {% endfor %}
+      {% endfor %}
+    </ul>
+</div>
+<!--<input type="text" id="dev" placeholder="EPDN2-710328">-->
+<label for="date_min">date min : </label>
+<input type="date" id="date_min" placeholder="yyyy-mm-dd">
+<label for="date_min">date max : </label>
+<input type="date" id="date_max" placeholder="yyyy-mm-dd">
+<button onclick="search()">search</button>
+<br><br>
+<div id="no_res" style="display : none">
+  Your search did not match any flights.
+</div>
+<div id="search_res" style="display : none">
+  Check the boxes to plot flight measurements. Click on a flight number to get information about it.
+  <table style="width: 70%">
+    <tr>
+      <th></th>
+      <th>flight</th>
+      <th>date</th>
+      <th>from</th>
+      <th>to</th>
+      <th>device</th>
+      <th>low LET</th>
+      <th>high LET</th>
+      <th>total</th>
+    </tr>
+    <tbody id="result"></tbody>
+  </table><br><br>
+  <a class="btn btn-primary" id="download_csv" href="">Download as csv</a>
+  <a class="btn btn-primary" id="download_excel" href="">Download as excel</a>
+  <div id="histo" style="width:100%;height:500px;"></div>
+  <hr>
+  <div id="stats" style="width:100%;height:500px;"></div>
+  <div id="graphs"></div>
+</div>
+{% endblock %}

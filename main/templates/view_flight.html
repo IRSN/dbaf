@@ -1,0 +1,19 @@
+{% extends "./base.html" %}
+{% load custom_tags %}
+{% block content %}
+<table width="200px">
+  <tr><td>{{flight.num}}</td><td>{{file.model}}</td><td>{{file.matricule}}</td></tr>
+</table>
+<table width="340px">
+  <tr><td>from :</td><td>{{flight.airport_from}} </td><td> at : </td><td>{{flight.time_dep|date:'d/m/Y H:i'}}</td></tr>
+  <tr><td>to :</td><td>{{flight.airport_to}} </td><td> at : </td><td>{{flight.time_arr|date:'d/m/Y H:i'}}</td></tr>
+</table>
+{% for d in data %}
+  <h3>{{d.device}} 
+    <small>{{d.idose.dose.normalize|format_ifvalue:' dose : {}'}}
+           {{d.idose.bas_LET.normalize|format_ifvalue:' bas LET : {}'}} 
+           {{d.idose.haut_LET.normalize|format_ifvalue:' haut LET : {}'}}</small></h3>
+  {% include "./data_tab.html" with data=d.rows columns=d.columns%}
+{% endfor %}
+
+{% endblock %}

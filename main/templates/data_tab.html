@@ -1,0 +1,24 @@
+{% load custom_tags %}
+<table style="width:100%">
+<tr>
+  <th>date</th>
+  {% for col in columns %}
+  <th>{{col}}</th>
+  {% endfor %}
+</tr>
+{% for d in data %}
+  <tr>
+    {% for c in d %}
+      <td>
+      {% if c|get_type == 'Decimal' %}
+        {{c.normalize}}
+      {% elif c|get_type == 'datetime' %}
+        {{c|date:"d/m/Y H:i"}}
+      {% else %}
+        {{c}}
+      {% endif %}
+      </td>
+    {% endfor %}
+  </tr>
+{% endfor %}
+</table>

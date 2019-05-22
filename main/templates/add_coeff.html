@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<form action="{% url 'add_coeff' %}" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <label for="device">device : </label>
+  <select name="device" required id="device">
+    <option disabled value selected>select device</option>
+    {% for device in devices %}
+      <option value="{{device.pk}}">{{device}}</option>
+    {% endfor %}
+  </select>
+  <br><br>
+  <label for="bLET"> coeff low LET : </label>
+  <input type="number" step="any" id="bLET" name="bLET" required>
+  <br><br>
+  <label for="hLET">coeff high LET : </label>
+  <input type="number" step="any" id="hLET" name="hLET" required>
+  <br><br>
+  <label for="date">start date : </label>
+  <input type="date" placeholder="yyyy-mm-dd" name="date" id="date" required/><br><br>
+  <input type="submit" value="submit"/>
+</form>
+{% endblock %}

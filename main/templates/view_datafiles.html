@@ -1,0 +1,9 @@
+{% extends "./base.html" %}
+
+{% block content %}
+
+{% for file in files %}
+<p><a href="{%url 'view_data' file.id%}">{{file.filename}}</a> {{file.upload_date|date:'d/m/Y H:i:s'}}</p>
+{% endfor %}
+
+{% endblock %}

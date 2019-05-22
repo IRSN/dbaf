@@ -1,0 +1,73 @@
+{% extends "./base.html" %}
+
+{% block content %}
+<script>
+
+function confirmDel(msg, red)
+{
+  if (confirm("Are you sure you want to want to delete " + msg + "?"))
+    window.location.href = red;
+}
+
+</script>
+
+<h4>Flights File</h4>
+<p>
+  file : <strong>{{file.filename}}</strong> upload at : <strong>{{file.upload_date|date:'d/m/Y H:i:s'}}</strong> by : <strong>{{file.user_fk}}</strong>
+  aircraft : <strong>{{file.matricule}} {{file.model}}</strong> 
+  <button class="btn btn-danger" style="margin-left:50px" onclick="confirmDel('{{file.filename}} and all related measurements files', '{% url 'del_flights' file.pk %}')">delete</button>
+</p>
+<hr>
+<h4>Measurements files</h4>
+<table style="width:20%">
+{% for datafile in datafiles %}
+  <tr style="height:40px;">
+      <th><a href="{% url 'view_data' datafile.pk %}">{{datafile.filename}}</a></th>
+    {% if request.user == file.user_fk or request.user.is_superuser %}
+      <th><button class="btn btn-danger" onclick="confirmDel('{{datafile.filename}}', '{% url 'del_data' datafile.pk %}')">delete</button></th>
+    {% endif %}
+</tr>
+{% endfor %}
+</table>
+{% if request.user == file.user_fk or request.user.is_superuser %}
+<br>
+<form action"{% url 'view_flights' file.pk %}" method="post" enctype="multipart/form-data">
+  Add related measurement file :
+<br>
+  {% csrf_token %}
+  <select name="dtype" required>
+    <option selected disabled>select device</option>
+    {% for dev in devices %}
+    <option>{{dev}}</option>
+    {% endfor %}
+  <select> 
+  <input name="datafile" type="file" style="display:inline" required>
+  <input type="submit" value="add">
+</form>
+{% endif %}
+<hr>
+<h4>Flights</h4>
+<table style="width:100%">
+<tr>
+  <th>N vol</th>
+  <th>Dep.</th>
+  <th>Arr.</th>
+  <th>out</th>
+  <th>off</th>
+  <th>on</th>
+  <th>in</th>
+</tr>
+{% for flight in flights %}
+  <tr>
+    <td><a href="{% url 'view_flight' flight.pk %}">{{flight.num}}</a></td>
+    <td>{{flight.airport_from}}</td>
+    <td>{{flight.airport_to}}</td>
+    <td>{{flight.time_out|date:'d/m/Y H:i'}}</td>
+    <td>{{flight.time_off|date:'d/m/Y H:i'}}</td>
+    <td>{{flight.time_on|date:'d/m/Y H:i'}}</td>
+    <td>{{flight.time_in|date:'d/m/Y H:i'}}</td>
+  </tr>
+{% endfor %}
+</table>
+
+{% endblock %}

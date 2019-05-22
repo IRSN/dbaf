@@ -1,0 +1,213 @@
+{% extends "./base.html" %}
+{% load custom_tags %}
+
+{% block content %}
+
+<script>
+
+window.onload = function(e) {
+  listFiles();
+  flightForm('file');
+}
+
+// display list of datafile with device selector
+function listFiles()
+{
+  var div = document.getElementById("datafiles");
+  var files = document.getElementById("files").files;
+  var html = "";
+  for (var i = 0; i < files.length; i++)
+  {
+    selectList = getSelectFormat(files[i].name);
+    html += '<p> \
+      <select name="device' + i + '" required onchange="selectVersion(' + i + ')" id="device' + i + '"> \
+      <option disabled ' + selectList[0] + ' value>select device</option> \
+       {% for device in deviceList %} \
+        <option value="{{device|get_attrs:"__class__.__name__"}}" ' 
+          + selectList[{{forloop.counter}}] + '>{{device.metadata.name}}</option> \
+      {% endfor %}  \
+      </select><span id="versions' + i  + '"></span> ' + files[i].name + ' </p>';
+  }
+  div.innerHTML = html;
+  for (var i = 0; i < files.length; i++)
+    selectVersion(i);
+}
+
+{% include 'version_selector.js' %} 
+
+// check the file extention and select the corresponding device
+function getSelectFormat(filename)
+{ 
+  var ret = Array({{deviceList|length}} + 1).fill('');
+  var selected = 0;
+  {% for dev in deviceList %}
+  var reg = RegExp('{{dev.metadata.fileExt|escapejs}}$');
+  if (selected ==0 && reg.test(filename))
+    selected = {{forloop.counter}};
+  {% endfor %}
+  ret[selected] = 'selected';
+  return ret;
+}
+
+function test()
+{
+ var elements = document.getElementById("form").elements;
+    var obj ={};
+    for(var i = 0 ; i < elements.length ; i++){
+        var item = elements.item(i);
+        obj[item.name] = item.value;
+    }
+console.log(elements.item(1));
+  var input = document.getElementById("files");
+  input.value = new File(["foo"], "foo.txt", {
+    type: "text/plain",
+  });
+  input.value = "foo.txt";
+}
+
+function flightForm(elem) 
+{
+  flightfile = document.getElementById("flightfile");
+  year = document.getElementById("year");
+  is_flightfile = document.getElementById("is_flightfile");
+  tab_file = document.getElementById("tab_file");
+  tab_input = document.getElementById("tab_input");
+  div_file = document.getElementById("div_file");
+  div_input = document.getElementById("div_input");
+
+  if (elem == 'input')
+  {
+    year.required = false;
+    flightfile.required = false;
+    is_flightfile.checked = false;
+    tab_file.classList.remove('btn-primary');
+    tab_input.classList.add('btn-primary');
+    div_file.style.display = 'none';
+    div_input.style.display = 'block';
+  } 
+  else
+  {
+    year.required = true;
+    flightfile.required = true;
+    is_flightfile.checked = true;
+    tab_file.classList.add('btn-primary');
+    tab_input.classList.remove('btn-primary');
+    div_file.style.display = 'block';
+    div_input.style.display = 'none';
+  }
+}
+
+var id_ = 0;
+var all_flights = {};
+
+function addFlight()
+{
+  flights = document.getElementById("flights");
+  num = document.getElementById("num").value;
+  from = document.getElementById("from").value;
+  to_ = document.getElementById("to").value;
+  date_ = document.getElementById("date").value;
+  off = document.getElementById("off").value;
+  on_ = document.getElementById("on").value;
+
+  if (num.trim() == "" || from.trim() == "" || to_.trim == "" || !(/\d{4}-\d{2}-\d{2}/g.test(date_))
+      || !(/\d{2}[:]\d{2}/g.test(off)) || !(/\d{2}[:]\d{2}/g.test(on_)))
+    return ;
+  flights.innerHTML += "<tr id='flight_" + id_ + "'><td>" + num + "</td><td>" + from + "</td><td>" + to_ 
+    + "</td><td>" + date_ + "</td><td>" + off + "</td><td>" + on_ + "</td><td>"
+    + "<button type='button' onclick='delFlight("+ id_ +")'>delete</button></td></tr>";
+  all_flights[id_] = {"num" : num, "from" : from, "to_" : to_, "date_" : date_, "off" : off, "on_" : on_};
+  id_++;
+}
+
+function delFlight(i)
+{
+  line = document.getElementById("flight_" + i);
+  line.parentNode.removeChild(line);
+  delete all_flights[i];
+}
+
+function genFile()
+{
+  is_flightfile = document.getElementById("is_flightfile").checked;
+  matricule = document.getElementById("mat").value;
+  model = document.getElementById("model").value;
+  gen_file = document.getElementById("gen_file");
+  
+  if (!is_flightfile)
+  {
+    gen_file.value = "\n\n\nMatricule Avion : " + matricule + ";Type Avion : " + model +"\n\n"
+      + "N volCause IRG;Date TdL;Dep.;Arr.;;;Dep.;Arr.;Tps Vol BlocTps Vol Air;;OUT;OFF;ON;IN;DL/Duree;CC/MeP/Pax\n";
+    for (var k in all_flights)
+    { 
+      var v = all_flights[k];
+      var tmp = new Date(v.date_);
+      var date_ = tmp.getDate() + "/" + (tmp.getMonth() + 1) + "/" +tmp.getFullYear();
+      gen_file.value +=  v.num + ";"+date_+";"+v.from+";"+v.to_+";S;"+date_+";"+v.off+":00;"
+        +v.on_+":00;A 00:00;"+date_+";A "+v.off+";A "+v.off+";A "+v.on_+";A "+v.on_+";;\n";
+    } 
+  }
+}
+
+</script>
+
+
+<form action="{% url 'upload' %}" method="post" enctype="multipart/form-data" id="form" onsubmit="genFile()">
+  {% csrf_token %}
+  <h4>Flights data</h4>
+  <p>You can either upload a flight file or manually enter flight data : </p>
+      <a class="btn btn-primary" id="tab_file" onclick="flightForm('file')">File input</a>
+      <a class="btn" id="tab_input" onclick="flightForm('input')">Manual input</a>
+<br>
+<hr>
+  <input name="is_flightfile" id="is_flightfile" type='checkbox' style='display : none' checked/>
+  <div id="div_file">
+  <p>You can add a flight file for which you need to give the year of the first flight of the file</p>
+    <input type="file" name="flightfile" id="flightfile" required>
+    <br>
+    <label>year : </label>
+    <input type="text" name="year" id="year" required>
+  </div>
+  <div id="div_input">
+    <p>You can add flights manually by filling this form</p><br>
+    <textarea name="gen_file" id="gen_file" style='display : none'></textarea>
+    <label for="mat">matricule : </label>
+    <input type='text' id="mat" placeholder="FGSPD"/>
+    <label for="model">model : </label>
+    <input type='text' id="model" placeholder="772"/>
+  <br><br>
+    <table style="width : 100%" class="table"> 
+    <tr>
+      <th>num</th>
+      <th>from</th>
+      <th>to</th>
+      <th>date</th>
+      <th>off</th>
+      <th>on</th>
+      <th></th>
+    </tr>
+    <tbody id="flights"></tbody>
+    <tr>
+      <td style="width : 15%"><input type='text' placeholder="AF 009" id="num" style="width : 100%"/></td>
+      <td style="width : 15%"><input type='text' placeholder="CDG" id="from" style="width : 100%"/></td>
+      <td style="width : 15%"><input type='text' placeholder="JFK" id="to" style="width : 100%"/></td>
+      <td style="width : 15%"><input type='date' placeholder="yyyy-mm-dd" id="date" style="width : 100%"/></td>
+      <td style="width : 15%"><input type='time' placeholder="HH:MM" id="off" style="width : 100%"/></td>
+      <td style="width : 15%"><input type='time' placeholder="HH:MM" id="on" style="width : 100%"/></td>
+      <td><button type='button' onclick='addFlight()'>Add</button></td>
+    </tr>
+   </table>
+ </div>
+
+  <hr style="height: 5px;border: 0px;box-shadow: inset 0 5px 5px -5px rgba(0, 0, 0, 0.5);">
+  <h4>Measurements files</h4>
+  <p>You can add multiple measurements files. For each file you then need to give the device type</p>
+    <input type="file" name="datafiles" id="files" onchange="listFiles()" multiple required>
+  <br>
+  <div id="datafiles">
+  </div>
+  <hr style="height: 5px;border: 0px;box-shadow: inset 0 5px 5px -5px rgba(0, 0, 0, 0.5);">
+  <input type="submit" value="submit"/>
+</form>
+
+{% endblock %}

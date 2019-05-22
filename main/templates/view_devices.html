@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h3>List of device</h3>
+<ul>
+{% for typ, dev in devs.items %}
+  <li>{{typ}}</li>
+  <ul>
+  {% for dv in dev %}
+    <li>{{dv.serial_num}}</li>
+  {% endfor %}
+  </ul>
+{% endfor %}
+</ul>
+
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<p>
+  DBAF is a database collecting the measurements of radiations performed by IRSN on Air-France flights. It has been designed by Paris Observatory and IRSN in the frame of the SIEVERT collaboration.<br>
+  From this page you can perform the following tasks:
+  <ul>
+    <li>Upload some data concerning flights or measurements that respect DBAF data format.</li>
+    <li>Search for a one or more flights in the database, and get some informations about them, together with the measurements performed on these flights (plots, text).</li>
+    <li>Search for measurement devices and get the flights on which measurements have been performed.</li>
+    <li>Add some measurement devices, version numbers, conversion coefficient to dose (hawk)</li>
+    <li>Display the list of files, devices, flights which are stored in DBAF</li>
+  </ul>
+To get an account, please contact DBAF manager, Francois Trompier (firstname.lastname@irsn.fr).
+</p>
+{% endblock %}
